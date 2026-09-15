@@ -38,7 +38,7 @@ var (
 
 const (
 	GithubRepoURL = "https://github.com/mimokpl/miwin-admin-template.git"
-	GiteeRepoURL  = "https://gitee.com/tx7do/miwin-admin-template.git"
+	GiteeRepoURL  = "https://gitee.com/miwin/miwin-admin-template.git"
 )
 
 func canReach(addr string, d time.Duration) bool {

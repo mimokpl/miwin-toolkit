@@ -484,7 +484,7 @@ modules:
         - FILE
 
 deps:
-  - "buf.build/go-wind/redact"
+  - "buf.build/miwin/redact"
 
 breaking:
   use:

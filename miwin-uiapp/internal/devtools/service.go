@@ -52,7 +52,7 @@ type AddServiceOptions struct {
 }
 
 const defaultTemplateRepo = "https://github.com/mimokpl/miwin-admin-template.git"
-const defaultGiteeTemplateRepo = "https://gitee.com/tx7do/miwin-admin-template.git"
+const defaultGiteeTemplateRepo = "https://gitee.com/miwin/miwin-admin-template.git"
 const templateModuleName = "github.com/mimokpl/miwin-admin-template"
 
 // GetServices 获取项目中的服务列表及详细信息

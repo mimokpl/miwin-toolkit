@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"net"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"time"
@@ -39,7 +41,25 @@ var (
 const (
 	GithubRepoURL = "https://github.com/mimokpl/miwin-admin-template.git"
 	GiteeRepoURL  = "https://gitee.com/miwin/miwin-admin-template.git"
+
+	// FallbackRepoURL 上游可用的同款模板，作为 miwin 模板仓库尚未发布时的兜底。
+	FallbackRepoURL = "https://github.com/tx7do/go-wind-admin-template.git"
 )
+
+// templateFallbackRepoURL 兜底模板仓库，可用环境变量 MIWIN_TEMPLATE_FALLBACK_REPO 覆盖。
+func templateFallbackRepoURL() string {
+	if v := strings.TrimSpace(os.Getenv("MIWIN_TEMPLATE_FALLBACK_REPO")); v != "" {
+		return v
+	}
+	return FallbackRepoURL
+}
+
+// repoReachable 用 git ls-remote 探测仓库是否可克隆。
+func repoReachable(repoURL string, timeout time.Duration) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+	return exec.CommandContext(ctx, "git", "ls-remote", "--exit-code", repoURL, "HEAD").Run() == nil
+}
 
 // 模板仓库地址可用环境变量覆盖，便于指向自建模板或上游临时仓库：
 //   MIWIN_TEMPLATE_REPO        GitHub 地址
@@ -87,6 +107,13 @@ func Run(cmd *cobra.Command, args []string) error {
 			repoURL = templateRepoURL()
 		} else {
 			repoURL = templateGiteeRepoURL()
+		}
+		// 默认模板仓库尚未发布时，自动回退到上游可用模板，保证开箱能用。
+		if !repoReachable(repoURL, 10*time.Second) {
+			if fb := templateFallbackRepoURL(); fb != "" && fb != repoURL {
+				log.Printf("⚠️  模板仓库 %s 不可用，回退到 %s", repoURL, fb)
+				repoURL = fb
+			}
 		}
 	}
 

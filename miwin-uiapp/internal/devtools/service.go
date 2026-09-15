@@ -58,6 +58,9 @@ const (
 	defaultTemplateRepo       = "https://github.com/mimokpl/miwin-admin-template.git"
 	defaultGiteeTemplateRepo  = "https://gitee.com/miwin/miwin-admin-template.git"
 	defaultTemplateModuleName = "github.com/mimokpl/miwin-admin-template"
+
+	// fallbackTemplateRepo 上游可用的同款模板，作为 miwin 模板仓库尚未发布时的兜底。
+	fallbackTemplateRepo = "https://github.com/tx7do/go-wind-admin-template.git"
 )
 
 // 模板仓库可用环境变量覆盖：
@@ -82,6 +85,20 @@ func giteeTemplateRepoURL() string {
 //  1. 环境变量 MIWIN_TEMPLATE_MODULE 优先；
 //  2. 否则由模板仓库地址推导；
 //  3. 兜底内置默认值。
+func fallbackTemplateRepoURL() string {
+	if v := strings.TrimSpace(os.Getenv("MIWIN_TEMPLATE_FALLBACK_REPO")); v != "" {
+		return v
+	}
+	return fallbackTemplateRepo
+}
+
+// gitRepoReachable 用 git ls-remote 探测仓库是否可克隆。
+func gitRepoReachable(repoURL string) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	return exec.CommandContext(ctx, "git", "ls-remote", "--exit-code", repoURL, "HEAD").Run() == nil
+}
+
 func templateModuleNameFor(repoURL string) string {
 	if v := strings.TrimSpace(os.Getenv("MIWIN_TEMPLATE_MODULE")); v != "" {
 		return v
@@ -321,6 +338,12 @@ func CreateProject(ctx context.Context, opts CreateProjectOptions) *CommandResul
 	repoURL := opts.RepoURL
 	if repoURL == "" {
 		repoURL = templateRepoURL()
+		// miwin 默认模板尚未发布时，回退到上游可用模板，保证开箱能用。
+		if !gitRepoReachable(repoURL) {
+			if fb := fallbackTemplateRepoURL(); fb != "" && fb != repoURL {
+				repoURL = fb
+			}
+		}
 	}
 
 	srcTemplateModule := opts.TemplateModule

@@ -41,6 +41,24 @@ const (
 	GiteeRepoURL  = "https://gitee.com/miwin/miwin-admin-template.git"
 )
 
+// 模板仓库地址可用环境变量覆盖，便于指向自建模板或上游临时仓库：
+//   MIWIN_TEMPLATE_REPO        GitHub 地址
+//   MIWIN_TEMPLATE_GITEE_REPO  Gitee 地址（GitHub 不可达时的回退）
+//   MIWIN_TEMPLATE_MODULE      模板的 go module 路径
+func templateRepoURL() string {
+	if v := strings.TrimSpace(os.Getenv("MIWIN_TEMPLATE_REPO")); v != "" {
+		return v
+	}
+	return GithubRepoURL
+}
+
+func templateGiteeRepoURL() string {
+	if v := strings.TrimSpace(os.Getenv("MIWIN_TEMPLATE_GITEE_REPO")); v != "" {
+		return v
+	}
+	return GiteeRepoURL
+}
+
 func canReach(addr string, d time.Duration) bool {
 	conn, err := net.DialTimeout("tcp", addr, d)
 	if err != nil {
@@ -53,7 +71,7 @@ func canReach(addr string, d time.Duration) bool {
 func init() {
 	timeout = "60s"
 
-	CmdProject.Flags().StringVarP(&repoURL, "repo-url", "r", GithubRepoURL, "layout repo")
+	CmdProject.Flags().StringVarP(&repoURL, "repo-url", "r", templateRepoURL(), "layout repo")
 	CmdProject.Flags().StringVarP(&branch, "branch", "b", branch, "repo branch")
 	CmdProject.Flags().StringVarP(&timeout, "timeout", "t", timeout, "time out")
 	CmdProject.Flags().StringVarP(&moduleName, "module", "m", moduleName, "set go module name, if not set, use project name")
@@ -66,9 +84,9 @@ func Run(cmd *cobra.Command, args []string) error {
 	// don't pay a blocking network round-trip on startup.
 	if !cmd.Flags().Changed("repo-url") {
 		if canReach("github.com:443", 3*time.Second) {
-			repoURL = GithubRepoURL
+			repoURL = templateRepoURL()
 		} else {
-			repoURL = GiteeRepoURL
+			repoURL = templateGiteeRepoURL()
 		}
 	}
 
@@ -165,7 +183,7 @@ func Run(cmd *cobra.Command, args []string) error {
 
 	case createErr := <-done:
 		if createErr != nil {
-			return fmt.Errorf("failed to create project: %w", createErr)
+			return fmt.Errorf("failed to create project: %w（默认模板仓库 %s 可能不存在；可用 -r/--repo-url 或环境变量 MIWIN_TEMPLATE_REPO 指定模板）", createErr, templateRepoURL())
 		}
 
 		if err = pkg.GoModTidy(ctx, filepath.Join(workingDir, projectName)); err != nil {

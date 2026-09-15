@@ -4,14 +4,23 @@ import (
 	"context"
 	"fmt"
 	"log"
+	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/mimokpl/miwin-toolkit/miwin/internal/pkg"
 )
 
-const (
-	TemplateModuleName = "github.com/mimokpl/miwin-admin-template"
-)
+const defaultTemplateModuleName = "github.com/mimokpl/miwin-admin-template"
+
+// TemplateModuleName 返回模板仓库的 go module 路径，脚手架时会被替换为目标模块名。
+// 可用环境变量 MIWIN_TEMPLATE_MODULE 覆盖（模板仓库换地址时通常要一起改）。
+func TemplateModuleName() string {
+	if v := strings.TrimSpace(os.Getenv("MIWIN_TEMPLATE_MODULE")); v != "" {
+		return v
+	}
+	return defaultTemplateModuleName
+}
 
 type Project struct {
 	Name   string
@@ -28,7 +37,7 @@ func (p *Project) New(ctx context.Context, dir string, layout string, branch str
 		return err
 	}
 
-	updateCount, err := pkg.ReplaceTemplateInCurrentDir(dir, TemplateModuleName, p.Module)
+	updateCount, err := pkg.ReplaceTemplateInCurrentDir(dir, TemplateModuleName(), p.Module)
 	if err != nil {
 		return err
 	}
@@ -53,7 +62,7 @@ func (p *Project) Add(ctx context.Context, dir string, layout string, branch str
 		return err
 	}
 
-	updateCount, err := pkg.ReplaceTemplateInCurrentDir(dir, TemplateModuleName, p.Module)
+	updateCount, err := pkg.ReplaceTemplateInCurrentDir(dir, TemplateModuleName(), p.Module)
 	if err != nil {
 		return err
 	}

@@ -42,6 +42,8 @@ type CreateProjectOptions struct {
 	RepoURL   string `json:"repoUrl"`
 	Branch    string `json:"branch"`
 	ParentDir string `json:"parentDir"`
+	// TemplateModule 模板仓库的 go module 路径；留空时取 MIWIN_TEMPLATE_MODULE 或内置默认值。
+	TemplateModule string `json:"templateModule"`
 }
 
 // AddServiceOptions 添加服务选项
@@ -51,9 +53,36 @@ type AddServiceOptions struct {
 	DbClients   []string `json:"dbClients"`
 }
 
-const defaultTemplateRepo = "https://github.com/mimokpl/miwin-admin-template.git"
-const defaultGiteeTemplateRepo = "https://gitee.com/miwin/miwin-admin-template.git"
-const templateModuleName = "github.com/mimokpl/miwin-admin-template"
+const (
+	defaultTemplateRepo       = "https://github.com/mimokpl/miwin-admin-template.git"
+	defaultGiteeTemplateRepo  = "https://gitee.com/miwin/miwin-admin-template.git"
+	defaultTemplateModuleName = "github.com/mimokpl/miwin-admin-template"
+)
+
+// 模板仓库可用环境变量覆盖：
+//   MIWIN_TEMPLATE_REPO        GitHub 地址
+//   MIWIN_TEMPLATE_GITEE_REPO  Gitee 地址
+//   MIWIN_TEMPLATE_MODULE      模板的 go module 路径
+func templateRepoURL() string {
+	if v := strings.TrimSpace(os.Getenv("MIWIN_TEMPLATE_REPO")); v != "" {
+		return v
+	}
+	return defaultTemplateRepo
+}
+
+func giteeTemplateRepoURL() string {
+	if v := strings.TrimSpace(os.Getenv("MIWIN_TEMPLATE_GITEE_REPO")); v != "" {
+		return v
+	}
+	return defaultGiteeTemplateRepo
+}
+
+func templateModuleName() string {
+	if v := strings.TrimSpace(os.Getenv("MIWIN_TEMPLATE_MODULE")); v != "" {
+		return v
+	}
+	return defaultTemplateModuleName
+}
 
 // GetServices 获取项目中的服务列表及详细信息
 func GetServices(projectRoot string) ([]ServiceInfo, error) {
@@ -281,7 +310,12 @@ func CreateProject(ctx context.Context, opts CreateProjectOptions) *CommandResul
 
 	repoURL := opts.RepoURL
 	if repoURL == "" {
-		repoURL = defaultTemplateRepo
+		repoURL = templateRepoURL()
+	}
+
+	srcTemplateModule := opts.TemplateModule
+	if srcTemplateModule == "" {
+		srcTemplateModule = templateModuleName()
 	}
 
 	moduleName := opts.Module
@@ -320,8 +354,8 @@ func CreateProject(ctx context.Context, opts CreateProjectOptions) *CommandResul
 	os.RemoveAll(gitHubDir)
 
 	// 替换模块名
-	allOutput.WriteString(fmt.Sprintf("替换模块名: %s -> %s\n", templateModuleName, moduleName))
-	updatedCount, err := replaceInDir(projectDir, templateModuleName, moduleName)
+	allOutput.WriteString(fmt.Sprintf("替换模块名: %s -> %s\n", srcTemplateModule, moduleName))
+	updatedCount, err := replaceInDir(projectDir, srcTemplateModule, moduleName)
 	if err != nil {
 		return &CommandResult{Success: false, Output: allOutput.String(), Error: fmt.Sprintf("替换模块名失败: %v", err)}
 	}

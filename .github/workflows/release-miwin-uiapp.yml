@@ -1,0 +1,216 @@
+name: Release miwin-uiapp
+
+on:
+  push:
+    tags:
+      - 'miwin-uiapp/v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: miwin-uiapp/go.mod
+          cache-dependency-path: |
+            miwin/go.sum
+            miwin-uiapp/go.sum
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: miwin-uiapp/frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: miwin-uiapp/frontend
+        run: npm ci
+
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Extract version
+        id: version
+        shell: bash
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          VERSION=${TAG#miwin-uiapp/}
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Build Windows
+        working-directory: miwin-uiapp
+        env:
+          NODE_OPTIONS: "--max-old-space-size=4096"
+        run: wails build -ldflags "-s -w" -o miwin-toolkit-windows-amd64.exe
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: miwin-toolkit-windows-amd64
+          path: miwin-uiapp/build/bin/miwin-toolkit-windows-amd64.exe
+
+  build-linux:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: miwin-uiapp/go.mod
+          cache-dependency-path: |
+            miwin/go.sum
+            miwin-uiapp/go.sum
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: miwin-uiapp/frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: miwin-uiapp/frontend
+        run: npm ci
+
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Build Linux
+        working-directory: miwin-uiapp
+        env:
+          NODE_OPTIONS: "--max-old-space-size=4096"
+        run: wails build -tags webkit2_41 -ldflags "-s -w" -o miwin-toolkit-linux-amd64
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: miwin-toolkit-linux-amd64
+          path: miwin-uiapp/build/bin/miwin-toolkit-linux-amd64
+
+  build-macos:
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Go
+        uses: actions/setup-go@v6
+        with:
+          go-version-file: miwin-uiapp/go.mod
+          cache-dependency-path: |
+            miwin/go.sum
+            miwin-uiapp/go.sum
+
+      - name: Setup Node
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: miwin-uiapp/frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: miwin-uiapp/frontend
+        run: npm ci
+
+      - name: Install Wails
+        run: go install github.com/wailsapp/wails/v2/cmd/wails@latest
+
+      - name: Build macOS
+        working-directory: miwin-uiapp
+        env:
+          NODE_OPTIONS: "--max-old-space-size=4096"
+        run: wails build -ldflags "-s -w" -o miwin-toolkit
+
+      - name: Zip macOS build
+        working-directory: miwin-uiapp/build/bin
+        run: |
+          ls -la
+          if [ -d "miwin-toolkit.app" ]; then
+            zip -r miwin-toolkit-darwin-arm64.zip miwin-toolkit.app
+          else
+            zip miwin-toolkit-darwin-arm64.zip miwin-toolkit
+          fi
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: miwin-toolkit-darwin-arm64
+          path: miwin-uiapp/build/bin/miwin-toolkit-darwin-arm64.zip
+
+  release:
+    needs: [build-windows, build-linux, build-macos]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Extract version
+        id: version
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          VERSION=${TAG#miwin-uiapp/}
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          PREV_TAG=$(git tag --list 'miwin-uiapp/v*' --sort=-version:refname | head -2 | tail -1)
+          if [ -n "$PREV_TAG" ]; then
+            CHANGES=$(git log --pretty=format:"- %s (%h)" "${PREV_TAG}..HEAD" -- miwin-uiapp/ || true)
+          else
+            CHANGES=$(git log --pretty=format:"- %s (%h)" HEAD -- miwin-uiapp/ || true)
+          fi
+          echo "changes<<EOF" >> "$GITHUB_OUTPUT"
+          echo "$CHANGES" >> "$GITHUB_OUTPUT"
+          echo "EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: build/
+          merge-multiple: true
+
+      - name: Create checksums
+        working-directory: build/
+        run: |
+          sha256sum * > ../checksums.txt
+          mv ../checksums.txt checksums.txt
+
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: "miwin-uiapp ${{ steps.version.outputs.version }}"
+          body: |
+            ## Changes
+            ${{ steps.changelog.outputs.changes }}
+
+            ## Downloads
+            | File | OS | Arch |
+            |------|----|------|
+            | `miwin-toolkit-windows-amd64.exe` | Windows | x86_64 |
+            | `miwin-toolkit-linux-amd64` | Linux | x86_64 |
+            | `miwin-toolkit-darwin-arm64.zip` | macOS | Apple Silicon |
+          files: |
+            build/*

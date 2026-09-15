@@ -56,31 +56,20 @@ type AddServiceOptions struct {
 
 const (
 	defaultTemplateRepo       = "https://github.com/mimokpl/miwin-admin-template.git"
-	defaultGiteeTemplateRepo  = "https://gitee.com/miwin/miwin-admin-template.git"
 	defaultTemplateModuleName = "github.com/mimokpl/miwin-admin-template"
 
-	// fallbackTemplateRepo / fallbackGiteeTemplateRepo 上游可用的同款模板，
-	// 作为 miwin 模板仓库尚未发布时的兜底。
-	fallbackTemplateRepo      = "https://github.com/tx7do/go-wind-admin-template.git"
-	fallbackGiteeTemplateRepo = "https://gitee.com/tx7do/go-wind-admin-template.git"
+	// fallbackTemplateRepo 上游可用的同款模板，作为 miwin 模板仓库不可用时的兜底。
+	fallbackTemplateRepo = "https://github.com/tx7do/go-wind-admin-template.git"
 )
 
 // 模板仓库可用环境变量覆盖：
-//   MIWIN_TEMPLATE_REPO        GitHub 地址
-//   MIWIN_TEMPLATE_GITEE_REPO  Gitee 地址
-//   MIWIN_TEMPLATE_MODULE      模板的 go module 路径
+//   MIWIN_TEMPLATE_REPO   GitHub 地址
+//   MIWIN_TEMPLATE_MODULE 模板的 go module 路径
 func templateRepoURL() string {
 	if v := strings.TrimSpace(os.Getenv("MIWIN_TEMPLATE_REPO")); v != "" {
 		return v
 	}
 	return defaultTemplateRepo
-}
-
-func giteeTemplateRepoURL() string {
-	if v := strings.TrimSpace(os.Getenv("MIWIN_TEMPLATE_GITEE_REPO")); v != "" {
-		return v
-	}
-	return defaultGiteeTemplateRepo
 }
 
 // templateModuleNameFor 解析模板仓库的 go module 路径：
@@ -92,13 +81,6 @@ func fallbackTemplateRepoURL() string {
 		return v
 	}
 	return fallbackTemplateRepo
-}
-
-func fallbackGiteeTemplateRepoURL() string {
-	if v := strings.TrimSpace(os.Getenv("MIWIN_TEMPLATE_FALLBACK_GITEE_REPO")); v != "" {
-		return v
-	}
-	return fallbackGiteeTemplateRepo
 }
 
 // gitRepoReachable 用 git ls-remote 探测仓库是否可克隆。
@@ -347,13 +329,10 @@ func CreateProject(ctx context.Context, opts CreateProjectOptions) *CommandResul
 	repoURL := opts.RepoURL
 	if repoURL == "" {
 		repoURL = templateRepoURL()
-		// miwin 默认模板尚未发布时，依次回退到上游 GitHub / Gitee 模板，保证开箱能用。
+		// miwin 默认模板不可用时，回退到上游 GitHub 模板，保证开箱能用。
 		if !gitRepoReachable(repoURL) {
-			for _, fb := range []string{fallbackTemplateRepoURL(), fallbackGiteeTemplateRepoURL()} {
-				if fb != "" && fb != repoURL && gitRepoReachable(fb) {
-					repoURL = fb
-					break
-				}
+			if fb := fallbackTemplateRepoURL(); fb != "" && fb != repoURL && gitRepoReachable(fb) {
+				repoURL = fb
 			}
 		}
 	}

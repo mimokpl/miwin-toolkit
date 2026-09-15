@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"log"
-	"net"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -40,28 +39,17 @@ var (
 
 const (
 	GithubRepoURL = "https://github.com/mimokpl/miwin-admin-template.git"
-	GiteeRepoURL  = "https://gitee.com/miwin/miwin-admin-template.git"
 
-	// FallbackRepoURL / FallbackGiteeRepoURL 上游可用的同款模板，
-	// 作为 miwin 模板仓库尚未发布时的兜底。
-	FallbackRepoURL      = "https://github.com/tx7do/go-wind-admin-template.git"
-	FallbackGiteeRepoURL = "https://gitee.com/tx7do/go-wind-admin-template.git"
+	// FallbackRepoURL 上游可用的同款模板，作为 miwin 模板仓库不可用时的兜底。
+	FallbackRepoURL = "https://github.com/tx7do/go-wind-admin-template.git"
 )
 
-// templateFallbackRepoURL 兜底模板仓库（GitHub），可用 MIWIN_TEMPLATE_FALLBACK_REPO 覆盖。
+// templateFallbackRepoURL 兜底模板仓库，可用环境变量 MIWIN_TEMPLATE_FALLBACK_REPO 覆盖。
 func templateFallbackRepoURL() string {
 	if v := strings.TrimSpace(os.Getenv("MIWIN_TEMPLATE_FALLBACK_REPO")); v != "" {
 		return v
 	}
 	return FallbackRepoURL
-}
-
-// templateFallbackGiteeRepoURL 兜底模板仓库（Gitee），可用 MIWIN_TEMPLATE_FALLBACK_GITEE_REPO 覆盖。
-func templateFallbackGiteeRepoURL() string {
-	if v := strings.TrimSpace(os.Getenv("MIWIN_TEMPLATE_FALLBACK_GITEE_REPO")); v != "" {
-		return v
-	}
-	return FallbackGiteeRepoURL
 }
 
 // repoReachable 用 git ls-remote 探测仓库是否可克隆。
@@ -72,30 +60,13 @@ func repoReachable(repoURL string, timeout time.Duration) bool {
 }
 
 // 模板仓库地址可用环境变量覆盖，便于指向自建模板或上游临时仓库：
-//   MIWIN_TEMPLATE_REPO        GitHub 地址
-//   MIWIN_TEMPLATE_GITEE_REPO  Gitee 地址（GitHub 不可达时的回退）
-//   MIWIN_TEMPLATE_MODULE      模板的 go module 路径
+//   MIWIN_TEMPLATE_REPO   GitHub 地址
+//   MIWIN_TEMPLATE_MODULE 模板的 go module 路径
 func templateRepoURL() string {
 	if v := strings.TrimSpace(os.Getenv("MIWIN_TEMPLATE_REPO")); v != "" {
 		return v
 	}
 	return GithubRepoURL
-}
-
-func templateGiteeRepoURL() string {
-	if v := strings.TrimSpace(os.Getenv("MIWIN_TEMPLATE_GITEE_REPO")); v != "" {
-		return v
-	}
-	return GiteeRepoURL
-}
-
-func canReach(addr string, d time.Duration) bool {
-	conn, err := net.DialTimeout("tcp", addr, d)
-	if err != nil {
-		return false
-	}
-	_ = conn.Close()
-	return true
 }
 
 func init() {
@@ -109,26 +80,14 @@ func init() {
 }
 
 func Run(cmd *cobra.Command, args []string) error {
-	// Default endpoint (no explicit -r): prefer GitHub, fall back to Gitee if
-	// unreachable. Probed here rather than in init() so unrelated commands
-	// don't pay a blocking network round-trip on startup.
+	// 一直使用 GitHub；默认模板仓库不可用时自动回退到上游同款模板，保证开箱能用。
+	// 探测放在这里而不是 init()，避免无关命令启动时白等一次网络探测。
 	if !cmd.Flags().Changed("repo-url") {
-		// 默认模板仓库尚未发布时，自动回退到上游可用模板，保证开箱能用。
-		if canReach("github.com:443", 3*time.Second) {
-			repoURL = templateRepoURL()
-			if !repoReachable(repoURL, 10*time.Second) {
-				if fb := templateFallbackRepoURL(); fb != "" && fb != repoURL {
-					log.Printf("⚠️  模板仓库 %s 不可用，回退到 %s", repoURL, fb)
-					repoURL = fb
-				}
-			}
-		} else {
-			repoURL = templateGiteeRepoURL()
-			if !repoReachable(repoURL, 10*time.Second) {
-				if fb := templateFallbackGiteeRepoURL(); fb != "" && fb != repoURL {
-					log.Printf("⚠️  模板仓库 %s 不可用，回退到 %s", repoURL, fb)
-					repoURL = fb
-				}
+		repoURL = templateRepoURL()
+		if !repoReachable(repoURL, 10*time.Second) {
+			if fb := templateFallbackRepoURL(); fb != "" && fb != repoURL {
+				log.Printf("⚠️  模板仓库 %s 不可用，回退到 %s", repoURL, fb)
+				repoURL = fb
 			}
 		}
 	}

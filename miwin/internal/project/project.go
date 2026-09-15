@@ -13,11 +13,19 @@ import (
 
 const defaultTemplateModuleName = "github.com/mimokpl/miwin-admin-template"
 
-// TemplateModuleName 返回模板仓库的 go module 路径，脚手架时会被替换为目标模块名。
-// 可用环境变量 MIWIN_TEMPLATE_MODULE 覆盖（模板仓库换地址时通常要一起改）。
-func TemplateModuleName() string {
+// templateModuleNameFor 解析模板仓库的 go module 路径，用于脚手架时替换为目标模块名：
+//  1. 环境变量 MIWIN_TEMPLATE_MODULE 优先；
+//  2. 否则由模板仓库地址推导（https://github.com/owner/repo.git -> github.com/owner/repo）；
+//  3. 兜底内置默认值。
+func templateModuleNameFor(repoURL string) string {
 	if v := strings.TrimSpace(os.Getenv("MIWIN_TEMPLATE_MODULE")); v != "" {
 		return v
+	}
+	if u, err := pkg.ParseVCSUrl(repoURL); err == nil {
+		p := strings.TrimSuffix(strings.TrimPrefix(u.Path, "/"), ".git")
+		if u.Host != "" && p != "" {
+			return u.Host + "/" + p
+		}
 	}
 	return defaultTemplateModuleName
 }
@@ -37,7 +45,7 @@ func (p *Project) New(ctx context.Context, dir string, layout string, branch str
 		return err
 	}
 
-	updateCount, err := pkg.ReplaceTemplateInCurrentDir(dir, TemplateModuleName(), p.Module)
+	updateCount, err := pkg.ReplaceTemplateInCurrentDir(dir, templateModuleNameFor(layout), p.Module)
 	if err != nil {
 		return err
 	}
@@ -62,7 +70,7 @@ func (p *Project) Add(ctx context.Context, dir string, layout string, branch str
 		return err
 	}
 
-	updateCount, err := pkg.ReplaceTemplateInCurrentDir(dir, TemplateModuleName(), p.Module)
+	updateCount, err := pkg.ReplaceTemplateInCurrentDir(dir, templateModuleNameFor(layout), p.Module)
 	if err != nil {
 		return err
 	}

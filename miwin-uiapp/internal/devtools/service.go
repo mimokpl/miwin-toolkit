@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"io/fs"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -77,9 +78,18 @@ func giteeTemplateRepoURL() string {
 	return defaultGiteeTemplateRepo
 }
 
-func templateModuleName() string {
+// templateModuleNameFor 解析模板仓库的 go module 路径：
+//  1. 环境变量 MIWIN_TEMPLATE_MODULE 优先；
+//  2. 否则由模板仓库地址推导；
+//  3. 兜底内置默认值。
+func templateModuleNameFor(repoURL string) string {
 	if v := strings.TrimSpace(os.Getenv("MIWIN_TEMPLATE_MODULE")); v != "" {
 		return v
+	}
+	if u, err := url.Parse(repoURL); err == nil && u.Host != "" {
+		if p := strings.TrimSuffix(strings.TrimPrefix(u.Path, "/"), ".git"); p != "" {
+			return u.Host + "/" + p
+		}
 	}
 	return defaultTemplateModuleName
 }
@@ -315,7 +325,7 @@ func CreateProject(ctx context.Context, opts CreateProjectOptions) *CommandResul
 
 	srcTemplateModule := opts.TemplateModule
 	if srcTemplateModule == "" {
-		srcTemplateModule = templateModuleName()
+		srcTemplateModule = templateModuleNameFor(repoURL)
 	}
 
 	moduleName := opts.Module

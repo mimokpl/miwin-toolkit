@@ -171,8 +171,21 @@ gow new <project-name> [flags]
 gow new project <project-name> [flags]
 
 Flags:
-  -m, --module string   Go module 名称（默认：项目名）
+  -m, --module string      Go module 名称（默认：项目名）
+  -r, --repo-url string    模板仓库地址（默认：内置 miwin 模板仓库）
+  -b, --branch string      模板分支
 ```
+
+> **模板仓库**：默认使用 `github.com/mimokpl/miwin-admin-template`（GitHub 不可达时回退 Gitee 镜像）。
+> 若该仓库尚未发布，用 `-r` 或环境变量指定一个已有模板即可：
+>
+> ```shell
+> export MIWIN_TEMPLATE_REPO="https://github.com/tx7do/go-wind-admin-template.git"
+> export MIWIN_TEMPLATE_MODULE="github.com/tx7do/go-wind-admin-template"
+> gow new project myapp
+> ```
+>
+> 可覆盖的变量：`MIWIN_TEMPLATE_REPO`、`MIWIN_TEMPLATE_GITEE_REPO`、`MIWIN_TEMPLATE_MODULE`。
 
 ### `gow add` — 新增组件
 

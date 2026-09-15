@@ -8,5 +8,3 @@ require (
 )
 
 require github.com/mimokpl/miwin-toolkit/protoc-gen-common v1.1.1
-
-replace github.com/mimokpl/miwin-toolkit/protoc-gen-common => ../protoc-gen-common

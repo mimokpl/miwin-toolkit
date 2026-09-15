@@ -8,5 +8,3 @@ require (
 )
 
 require google.golang.org/genproto/googleapis/api v0.0.0-20260911204522-f61a6ca850bd
-
-replace github.com/mimokpl/miwin-toolkit/protoc-gen-common => ../protoc-gen-common

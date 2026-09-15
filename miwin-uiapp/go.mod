@@ -4,7 +4,6 @@ go 1.25.6
 
 require github.com/mimokpl/miwin-toolkit/miwin v1.1.1
 
-replace github.com/mimokpl/miwin-toolkit/miwin => ../miwin
 
 require (
 	github.com/go-sql-driver/mysql v1.9.3

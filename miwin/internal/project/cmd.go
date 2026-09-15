@@ -42,16 +42,26 @@ const (
 	GithubRepoURL = "https://github.com/mimokpl/miwin-admin-template.git"
 	GiteeRepoURL  = "https://gitee.com/miwin/miwin-admin-template.git"
 
-	// FallbackRepoURL 上游可用的同款模板，作为 miwin 模板仓库尚未发布时的兜底。
-	FallbackRepoURL = "https://github.com/tx7do/go-wind-admin-template.git"
+	// FallbackRepoURL / FallbackGiteeRepoURL 上游可用的同款模板，
+	// 作为 miwin 模板仓库尚未发布时的兜底。
+	FallbackRepoURL      = "https://github.com/tx7do/go-wind-admin-template.git"
+	FallbackGiteeRepoURL = "https://gitee.com/tx7do/go-wind-admin-template.git"
 )
 
-// templateFallbackRepoURL 兜底模板仓库，可用环境变量 MIWIN_TEMPLATE_FALLBACK_REPO 覆盖。
+// templateFallbackRepoURL 兜底模板仓库（GitHub），可用 MIWIN_TEMPLATE_FALLBACK_REPO 覆盖。
 func templateFallbackRepoURL() string {
 	if v := strings.TrimSpace(os.Getenv("MIWIN_TEMPLATE_FALLBACK_REPO")); v != "" {
 		return v
 	}
 	return FallbackRepoURL
+}
+
+// templateFallbackGiteeRepoURL 兜底模板仓库（Gitee），可用 MIWIN_TEMPLATE_FALLBACK_GITEE_REPO 覆盖。
+func templateFallbackGiteeRepoURL() string {
+	if v := strings.TrimSpace(os.Getenv("MIWIN_TEMPLATE_FALLBACK_GITEE_REPO")); v != "" {
+		return v
+	}
+	return FallbackGiteeRepoURL
 }
 
 // repoReachable 用 git ls-remote 探测仓库是否可克隆。
@@ -103,16 +113,22 @@ func Run(cmd *cobra.Command, args []string) error {
 	// unreachable. Probed here rather than in init() so unrelated commands
 	// don't pay a blocking network round-trip on startup.
 	if !cmd.Flags().Changed("repo-url") {
+		// 默认模板仓库尚未发布时，自动回退到上游可用模板，保证开箱能用。
 		if canReach("github.com:443", 3*time.Second) {
 			repoURL = templateRepoURL()
+			if !repoReachable(repoURL, 10*time.Second) {
+				if fb := templateFallbackRepoURL(); fb != "" && fb != repoURL {
+					log.Printf("⚠️  模板仓库 %s 不可用，回退到 %s", repoURL, fb)
+					repoURL = fb
+				}
+			}
 		} else {
 			repoURL = templateGiteeRepoURL()
-		}
-		// 默认模板仓库尚未发布时，自动回退到上游可用模板，保证开箱能用。
-		if !repoReachable(repoURL, 10*time.Second) {
-			if fb := templateFallbackRepoURL(); fb != "" && fb != repoURL {
-				log.Printf("⚠️  模板仓库 %s 不可用，回退到 %s", repoURL, fb)
-				repoURL = fb
+			if !repoReachable(repoURL, 10*time.Second) {
+				if fb := templateFallbackGiteeRepoURL(); fb != "" && fb != repoURL {
+					log.Printf("⚠️  模板仓库 %s 不可用，回退到 %s", repoURL, fb)
+					repoURL = fb
+				}
 			}
 		}
 	}

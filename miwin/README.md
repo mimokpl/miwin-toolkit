@@ -185,7 +185,12 @@ Flags:
 > gow new project myapp
 > ```
 >
-> 可覆盖的变量：`MIWIN_TEMPLATE_REPO`、`MIWIN_TEMPLATE_GITEE_REPO`、`MIWIN_TEMPLATE_MODULE`。
+> **自动兜底**：默认模板仓库不可达时，会自动回退到上游可用模板（GitHub 回退
+> `github.com/tx7do/go-wind-admin-template`，Gitee 回退 `gitee.com/tx7do/go-wind-admin-template`），
+> 因此开箱即可用；miwin 模板仓库发布后会优先使用。
+>
+> 可覆盖的变量：`MIWIN_TEMPLATE_REPO`、`MIWIN_TEMPLATE_GITEE_REPO`、
+> `MIWIN_TEMPLATE_FALLBACK_REPO`、`MIWIN_TEMPLATE_FALLBACK_GITEE_REPO`、`MIWIN_TEMPLATE_MODULE`。
 
 ### `gow add` — 新增组件
 

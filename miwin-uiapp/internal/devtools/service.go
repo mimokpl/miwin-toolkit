@@ -394,6 +394,15 @@ func CreateProject(ctx context.Context, opts CreateProjectOptions) *CommandResul
 	}
 	allOutput.WriteString(fmt.Sprintf("已更新 %d 个文件\n", updatedCount))
 
+	// buf generate（模板通常不提交 api/gen，必须先按 proto 生成再 tidy）
+	allOutput.WriteString("运行 buf generate...\n")
+	genResult := RunBufGenerate(projectDir)
+	allOutput.WriteString(genResult.Output)
+	if !genResult.Success {
+		allOutput.WriteString(genResult.Error)
+		return &CommandResult{Success: false, Output: allOutput.String(), Error: genResult.Error}
+	}
+
 	// go mod tidy
 	allOutput.WriteString("运行 go mod tidy...\n")
 	tidyResult := RunGoModTidy(projectDir)

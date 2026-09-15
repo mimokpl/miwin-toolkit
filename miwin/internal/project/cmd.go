@@ -213,12 +213,14 @@ func Run(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("failed to create project: %w（默认模板仓库 %s 可能不存在；可用 -r/--repo-url 或环境变量 MIWIN_TEMPLATE_REPO 指定模板）", createErr, templateRepoURL())
 		}
 
-		if err = pkg.GoModTidy(ctx, filepath.Join(workingDir, projectName)); err != nil {
-			return fmt.Errorf("failed to run `go mod tidy`: %w", err)
-		}
-
+		// 先按 proto 生成 api 代码，再 go mod tidy：
+		// 模板仓库通常不提交 api/gen，先生成才能解析这些 import。
 		if err = buf.GenerateFromPath(ctx, filepath.Join(workingDir, projectName, "api")); err != nil {
 			return fmt.Errorf("failed to generate api code: %w", err)
+		}
+
+		if err = pkg.GoModTidy(ctx, filepath.Join(workingDir, projectName)); err != nil {
+			return fmt.Errorf("failed to run `go mod tidy`: %w", err)
 		}
 
 		fmt.Printf("✅ Project %s created successfully at %s\n", projectName, filepath.Join(workingDir, projectName))
